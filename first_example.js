@@ -1,5 +1,10 @@
 const winWidth = p5.prototype.windowWidth;
 const winHeight = p5.prototype.windowHeight;
+const rand = p5.prototype.random;
+
+const SQUARE_SIZE = 30;
+const SPEED = 4;
+const DETECTION_SIZE = SQUARE_SIZE/2 + SPEED*2;
 
 function setup() {
   var canvas = createCanvas(windowWidth, windowHeight);
@@ -7,23 +12,41 @@ function setup() {
   background('#eee');
 }
 
-function Square(w,h) {
-  this.w = w;
-  this.h = h;
-  this.x = Math.floor(Math.random() * winWidth);
-  this.y = Math.floor(Math.random() * winHeight);
+function Square(size) {
+  this.size = size;
+  this.x = Math.floor(Math.random() * (winWidth - size));
+  this.y = Math.floor(Math.random() * (winHeight - size));
+  this.speedX = Math.random() * SPEED;
+  this.speedY = Math.random() * SPEED;
 
-  this.speedX = Math.random() * 8;
-  this.speedY = Math.random() * 8;
+  this.color = {
+    r: rand(255),
+    g: rand(255),
+    b: rand(255)
+  }
+
+  if (Math.random() > .5){
+    this.speedX *= -1
+  }
+  if (Math.random() > .5){
+    this.speedY *= -1
+  }
+}
+
+Square.prototype.getCX = function(){
+  return this.x + this.size/2
+}
+Square.prototype.getCY = function(){
+  return this.y + this.size/2
 }
 
 Square.prototype.update = function(){
   // bounce sides
-  if (this.x >= winWidth || this.x <= 0){
+  if (this.getCX() >= winWidth - (this.size/2) || this.getCX() <= 0 + (this.size/2)){
     this.speedX *= -1
   }
   // bounce top/bottom
-  if (this.y >= winHeight || this.y <= 0){
+  if (this.getCY() >= winHeight - (this.size/2) || this.getCY() <= 0 + (this.size/2)){
     this.speedY *= -1
   }
   // update position
@@ -34,18 +57,53 @@ Square.prototype.update = function(){
 // make an array of square objects
 var squares = [];
 for (i=0; i < 50; i++){
-  var x = new Square(5,5)
+  var x = new Square(SQUARE_SIZE)
   squares.push(x)
 }
 console.log('You made',squares.length, 'squares');
-
 function detectCollision(sq_arr) {
 
   var squares = [];
   sq_arr.forEach(x => squares.push(x));
 
   this.resolve = function(arr){
-    console.log('Collision:', arr.length);
+    // console.log('Collision:', arr.length);
+    if (arr.length === 2){
+
+      var deltaX = Math.abs(arr[0].x - arr[1].x);
+      var deltaY = Math.abs(arr[0].y - arr[1].y);
+
+      if (deltaX > deltaY){
+        var temp = arr[0].speedX;
+        arr[0].speedX = arr[1].speedX;
+        arr[1].speedX = temp;
+      } else if (deltaX === deltaY){
+        // collide on diagonal
+        var temp = arr[0].speedY;
+        arr[0].speedY = arr[1].speedY;
+        arr[1].speedY = temp;
+        temp = arr[0].speedX;
+        arr[0].speedX = arr[1].speedX;
+        arr[1].speedX = temp;
+      } else {
+        var temp = arr[0].speedY;
+        arr[0].speedY = arr[1].speedY;
+        arr[1].speedY = temp;
+      }
+
+    } else {
+      console.log('BLAM');
+      temp_arr = [];
+      arr.forEach(x => { temp_arr.push(x)})
+      var shift = temp_arr.shift();
+      temp_arr.push(shift);
+
+      for (i=0; i<arr.length; i++){
+        arr[i].speedX = temp_arr[i].speedX;
+        arr[i].speedY = temp_arr[i].speedY;
+      }
+
+    }
   }
 
   function check(arr){
@@ -55,19 +113,20 @@ function detectCollision(sq_arr) {
       var collision = [];
       var current = arr.shift();
       var next = arr.filter(sq => {
-        // return to next of NOT in collision with arr[1]
-        if (Math.abs(current.x - sq.x) <= 5 && Math.abs(current.y - sq.y) <= 5){
-          collision.push(sq)
-          return
+        var deltaX = Math.abs(current.getCX() - sq.getCX());
+        var deltaY = Math.abs(current.getCY() - sq.getCY());
+        if (deltaY <= DETECTION_SIZE && deltaX <= DETECTION_SIZE){
+          collision.push(sq);
+          return false
         } else {
           // not a collision
-          return sq
+          return true
         }
       })
       // if collision
       if (collision.length){
         // send those squares to resolve function
-        collision.push(arr[0]);
+        collision.push(current);
         this.resolve(collision);
       }
       check(next);
@@ -80,9 +139,11 @@ function detectCollision(sq_arr) {
 function draw() {
   background('#eee');
   fill('black');
-  // stroke('white')
+  stroke('white')
   squares.map( sqr => {
-    rect(sqr.x, sqr.y, sqr.w, sqr.h)
+    c = color(sqr.color.r, sqr.color.g, sqr.color.b);
+    fill(c);
+    rect(sqr.x, sqr.y, sqr.size, sqr.size)
   })
   squares.map( sqr => {
     sqr.update();
