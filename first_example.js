@@ -4,7 +4,7 @@ const rand = p5.prototype.random;
 
 const SQUARE_SIZE = 30;
 const SPEED = 4;
-const DETECTION_SIZE = SQUARE_SIZE/2 + SPEED*2;
+const GROW_RATE = 5;
 
 function setup() {
   var canvas = createCanvas(windowWidth, windowHeight);
@@ -13,11 +13,15 @@ function setup() {
 }
 
 function Square(size) {
-  this.size = size;
+  this.w = size;
+  this.h = size;
   this.x = Math.floor(Math.random() * (winWidth - size));
   this.y = Math.floor(Math.random() * (winHeight - size));
   this.speedX = Math.random() * SPEED;
   this.speedY = Math.random() * SPEED;
+
+  this.target = 0;
+  this.current = 0;
 
   this.color = {
     r: rand(255),
@@ -33,22 +37,49 @@ function Square(size) {
   }
 }
 
+// const DETECTION_SIZE_X = SQUARE_SIZE/2 + SPEED*2;
+// const DETECTION_SIZE_Y = SQUARE_SIZE/2 + SPEED*2 + GROW_RATE;
+
+Square.prototype.detectY = function() {
+  return this.h/2 + this.speedY;
+}
+Square.prototype.detectX = function() {
+  return this.w/2 + this.speedX;
+}
+
+
 Square.prototype.getCX = function(){
-  return this.x + this.size/2
+  return this.x + this.w/2
 }
 Square.prototype.getCY = function(){
-  return this.y + this.size/2
+  return this.y + this.h/2
+}
+
+Square.prototype.updateLength = function(len){
+  this.h = len;
 }
 
 Square.prototype.update = function(){
   // bounce sides
-  if (this.getCX() >= winWidth - (this.size/2) || this.getCX() <= 0 + (this.size/2)){
+  if (this.getCX() >= winWidth - this.detectX() || this.getCX() <= 0 + this.detectX() ){
     this.speedX *= -1
   }
   // bounce top/bottom
-  if (this.getCY() >= winHeight - (this.size/2) || this.getCY() <= 0 + (this.size/2)){
+  if (this.getCY() >= winHeight - this.detectY() || this.getCY() <= 0 + this.detectY() ){
     this.speedY *= -1
   }
+
+  if (this.target > this.current) {
+    this.current += GROW_RATE;
+  }
+  if (this.current >= this.target) {
+    this.target = 0;
+    this.current -= 2;
+  }
+  if (this.current >= 0){
+    this.updateLength(SQUARE_SIZE + this.current);
+  }
+
   // update position
   this.x += this.speedX;
   this.y += this.speedY;
@@ -67,43 +98,9 @@ function detectCollision(sq_arr) {
   sq_arr.forEach(x => squares.push(x));
 
   this.resolve = function(arr){
-    // console.log('Collision:', arr.length);
-    if (arr.length === 2){
-
-      var deltaX = Math.abs(arr[0].x - arr[1].x);
-      var deltaY = Math.abs(arr[0].y - arr[1].y);
-
-      if (deltaX > deltaY){
-        var temp = arr[0].speedX;
-        arr[0].speedX = arr[1].speedX;
-        arr[1].speedX = temp;
-      } else if (deltaX === deltaY){
-        // collide on diagonal
-        var temp = arr[0].speedY;
-        arr[0].speedY = arr[1].speedY;
-        arr[1].speedY = temp;
-        temp = arr[0].speedX;
-        arr[0].speedX = arr[1].speedX;
-        arr[1].speedX = temp;
-      } else {
-        var temp = arr[0].speedY;
-        arr[0].speedY = arr[1].speedY;
-        arr[1].speedY = temp;
-      }
-
-    } else {
-      console.log('BLAM');
-      temp_arr = [];
-      arr.forEach(x => { temp_arr.push(x)})
-      var shift = temp_arr.shift();
-      temp_arr.push(shift);
-
-      for (i=0; i<arr.length; i++){
-        arr[i].speedX = temp_arr[i].speedX;
-        arr[i].speedY = temp_arr[i].speedY;
-      }
-
-    }
+    arr.forEach(x => {
+      x.target = x.h + (x.h > SQUARE_SIZE ? 0 : Math.floor(Math.random() * 150));
+    })
   }
 
   function check(arr){
@@ -115,7 +112,7 @@ function detectCollision(sq_arr) {
       var next = arr.filter(sq => {
         var deltaX = Math.abs(current.getCX() - sq.getCX());
         var deltaY = Math.abs(current.getCY() - sq.getCY());
-        if (deltaY <= DETECTION_SIZE && deltaX <= DETECTION_SIZE){
+        if (deltaY <= sq.detectY()+current.detectY() && deltaX <= sq.detectX()+ current.detectX() ){
           collision.push(sq);
           return false
         } else {
@@ -138,12 +135,11 @@ function detectCollision(sq_arr) {
 
 function draw() {
   background('#eee');
-  fill('black');
-  stroke('white')
   squares.map( sqr => {
     c = color(sqr.color.r, sqr.color.g, sqr.color.b);
     fill(c);
-    rect(sqr.x, sqr.y, sqr.size, sqr.size)
+    noStroke();
+    rect(sqr.x, sqr.y, sqr.w, sqr.h)
   })
   squares.map( sqr => {
     sqr.update();
